@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const LangContext = createContext();
 
 export function LangProvider({ children }) {
-  const [lang, setLang] = useState('ar'); // اللغة الافتراضية عربي لفخامة المكان
+  const [lang, setLang] = useState('en'); // اللغة الافتراضية إنجليزي لفخامة المكان
 
   // الـ Hook ده بيضمن إن الصفحة تقلب اتجاهها أول ما اللغة تتغير
   useEffect(() => {

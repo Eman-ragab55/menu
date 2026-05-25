@@ -6,6 +6,8 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
+  // 'cash' هي القيمة الأساسية (كاش عند الاستلام) وتتغير لـ 'online' عند اختيار إنستا باي/فودافون كاش
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   // إضافة طبق للسلة
   const addToCart = (dish) => {
@@ -24,6 +26,7 @@ export function CartProvider({ children }) {
   const removeFromCart = (dishId) => {
     setCartItems((prevItems) => {
       const existingItem = prevItems.find((item) => item.id === dishId);
+      if (!existingItem) return prevItems;
       if (existingItem.quantity === 1) {
         return prevItems.filter((item) => item.id !== dishId);
       }
@@ -38,10 +41,18 @@ export function CartProvider({ children }) {
     setCartItems((prevItems) => prevItems.filter((item) => item.id !== dishId));
   };
 
-  // تفريغ السلة كاملة (بعد إتمام الطلب مثلاً)
-  const clearCart = () => setCartItems([]);
+  // تفريغ السلة كاملة وإرجاع طريقة الدفع للوضع الافتراضي
+  const clearCart = () => {
+    setCartItems([]);
+    setPaymentMethod('cash');
+  };
 
-  // تعلية الـ Performance بإستخدام useMemo لحساب الإجمالي والعدد
+  // تغيير طريقة الدفع (نادي عليها من الـ UI لتغيير الاختيار)
+  const updatePaymentMethod = (method) => {
+    setPaymentMethod(method);
+  };
+
+  // تعلية الـ Performance باستخدام useMemo لحساب الإجمالي والعدد
   const cartCount = useMemo(() => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   }, [cartItems]);
@@ -53,10 +64,12 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider value={{
       cartItems,
+      paymentMethod,
       addToCart,
       removeFromCart,
       clearItem,
       clearCart,
+      updatePaymentMethod,
       cartCount,
       cartTotal
     }}>

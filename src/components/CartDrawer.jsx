@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useCart } from "@/src/context/CartContext";
 import { useLang } from "@/src/context/LangContext";
 import { menuData } from "@/src/data/menuData";
-import { supabase } from "@/src/utils/supabaseClient"; // ملف السوبابيز اللي عملناه
+import { supabase } from "@/src/utils/supabaseClient"; 
 import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, ImageIcon, Copy, Check } from "lucide-react";
 
 export default function CartDrawer({ isOpen, onClose }) {
@@ -19,13 +19,13 @@ export default function CartDrawer({ isOpen, onClose }) {
   } = useCart();
   const { lang } = useLang();
 
-  // بيانات العميل
+  // states لبيانات العميل
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [phone1, setPhone1] = useState("");
   const [phone2, setPhone2] = useState("");
   
-  // رفع الإسكرين
+  // states لرفع الإسكرين والمعاينة
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -33,10 +33,10 @@ export default function CartDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // رقم إنستا باي الخاص بيكِ
+  // رقم الحساب أو الموبايل الخاص بإنستا باي
   const myInstaPayNumber = "01273216946";
 
-  // دالة التعامل مع اختيار صورة الإسكرين
+  // دالة التعامل مع اختيار ملف الصورة
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -45,18 +45,17 @@ export default function CartDrawer({ isOpen, onClose }) {
     }
   };
 
-  // دالة النسخ التلقائي وفتح تطبيق إنستا باي فوراً
+  // دالة نسخ الرقم تلقائياً وفتح تطبيق إنستا باي للتحويل السريع
   const handleOpenInstaPay = () => {
-    // 1️⃣ نسخ الرقم في الحافظة (Clipboard) تلقائياً لتسهيل التجربة
     navigator.clipboard.writeText(myInstaPayNumber);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 3000);
 
-    // 2️⃣ فتح تطبيق إنستا باي الموبايل مباشرة عن طريق الـ Deep Link
+    // محاولة فتح التطبيق مباشرة عبر الـ Deep Link
     window.location.href = "instapay://";
   };
 
-  // دالة تأكيد الأوردر وحفظه في الـ Database
+  // دالة الحفظ في سوبابيز ثم فتح الواتساب
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
@@ -65,7 +64,9 @@ export default function CartDrawer({ isOpen, onClose }) {
       return;
     }
 
-    if (paymentMethod === "online" && !screenshotFile) {
+    // التحقق من رفع الصورة لو العميل اختار إنستا باي
+    const isOnline = paymentMethod === "online" || paymentMethod === "InstaPay / Cash";
+    if (isOnline && !screenshotFile) {
       alert(lang === "ar" ? "برجاء رفع إسكرين تحويل إنستا باي لتأكيد الطلب!" : "Please upload the InstaPay transfer screenshot!");
       return;
     }
@@ -74,8 +75,8 @@ export default function CartDrawer({ isOpen, onClose }) {
       setIsUploading(true);
       let screenshotUrl = null;
 
-      // 1️⃣ رفع الإسكرين إلى Supabase Storage لو الدفع أونلاين
-      if (paymentMethod === "online" && screenshotFile) {
+      // 1️⃣ رفع الصورة للـ Supabase Storage Bucket
+      if (isOnline && screenshotFile) {
         const fileExt = screenshotFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
@@ -92,7 +93,7 @@ export default function CartDrawer({ isOpen, onClose }) {
         screenshotUrl = publicUrlData.publicUrl;
       }
 
-      // 2️⃣ حفظ البيانات كاملة في الـ Database (جدول orders)
+      // 2️⃣ إدخال الأوردر في جدول الـ orders بالداتابيز
       const { error: orderError } = await supabase
         .from('orders')
         .insert([
@@ -101,7 +102,7 @@ export default function CartDrawer({ isOpen, onClose }) {
             customer_address: customerAddress,
             phone1: phone1,
             phone2: phone2 || null,
-            payment_method: paymentMethod,
+            payment_method: isOnline ? "online" : "cash",
             cart_items: cartItems, 
             cart_total: cartTotal,
             screenshot_url: screenshotUrl
@@ -110,10 +111,10 @@ export default function CartDrawer({ isOpen, onClose }) {
 
       if (orderError) throw orderError;
 
-      // 3️⃣ توجيه العميل للواتساب للمتابعة الشات مع المطعم
+      // 3️⃣ بناء رسالة الواتساب وتوجيه العميل للمتابعة اللحظية
       let paymentText = lang === "ar"
-        ? (paymentMethod === "online" ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
-        : (paymentMethod === "online" ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
+        ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
+        : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
       let message = lang === "ar" 
         ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تم تسجيل الأوردر بنجاح في نظام المطعم وجاري مراجعته!*`
@@ -132,10 +133,15 @@ export default function CartDrawer({ isOpen, onClose }) {
     }
   };
 
+  // لتحديد هل السيكشن المالي مفتوح أم لا بناء على قيمة الـ state عندك
+  const isOnlineSelected = paymentMethod === "online" || paymentMethod === "InstaPay / Cash";
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* الخلفية المضببة الشفافة */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
+      {/* لوحة السلة الجانبية الفخمة المتناسقة مع Ayla */}
       <div className={`fixed top-0 bottom-0 w-full max-w-md bg-[#0d0d0d] border-stone-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 overflow-y-auto ${
         lang === "ar" ? "left-0 border-r" : "right-0 border-l"
       }`}>
@@ -146,72 +152,116 @@ export default function CartDrawer({ isOpen, onClose }) {
             <ShoppingBag className="h-5 w-5 text-amber-500 stroke-[1.5]" />
             <h2 className="text-lg font-light text-stone-100">{lang === "ar" ? "سلة المأكولات" : "Your Order"}</h2>
           </div>
-          <button onClick={onClose} className="p-1 text-stone-400 hover:text-white"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="p-1 text-stone-400 hover:text-white">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* قائمة المنتجات */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-none max-h-[25vh]">
+        {/* قائمة المنتجات في السلة */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-none max-h-[30vh]">
           {cartItems.map((item) => (
             <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.01] border border-white/[0.03]">
               <div className="flex-1 min-w-0 pr-2">
-                <h4 className="text-sm font-light text-stone-200 truncate">{item.name[lang]}</h4>
-                <p className="text-xs text-amber-500/80 font-inter mt-1">{item.price * item.quantity} {lang === "ar" ? "ج.م" : "EGP"}</p>
+                <h4 className="text-sm font-light text-stone-200 truncate">{item.name[lang] || item.name}</h4>
+                <p className="text-xs text-amber-500/80 font-inter mt-1">
+                  {item.price * item.quantity} {lang === "ar" ? "ج.م" : "EGP"}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center bg-stone-900 border border-white/[0.05] rounded-lg overflow-hidden">
-                  <button onClick={() => removeFromCart(item.id)} className="p-1.5 text-stone-400 hover:text-white"><Minus className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => removeFromCart(item.id)} className="p-1.5 text-stone-400 hover:text-white">
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
                   <span className="px-2 text-xs font-inter font-medium text-stone-200">{item.quantity}</span>
-                  <button onClick={() => addToCart(item)} className="p-1.5 text-stone-400 hover:text-white"><Plus className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => addToCart(item)} className="p-1.5 text-stone-400 hover:text-white">
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button onClick={() => clearItem(item.id)} className="p-2 text-stone-600 hover:text-red-400"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => clearItem(item.id)} className="p-2 text-stone-600 hover:text-red-400">
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* الفاتورة والفورم */}
+        {/* سيكشن الدفع والفواتير والبيانات كاملة */}
         {cartItems.length > 0 && (
           <div className="pt-4 border-t border-white/[0.05] space-y-4">
             
             {/* بيانات التوصيل */}
             <div className="space-y-2.5 bg-white/[0.01] border border-white/[0.02] p-3 rounded-xl">
-              <label className="text-xs font-light text-stone-400 tracking-wider block">{lang === "ar" ? "بيانات التوصيل" : "DELIVERY DETAILS"}</label>
-              <input type="text" placeholder={lang === "ar" ? "الاسم بالكامل *" : "Full Name *"} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" />
-              <input type="text" placeholder={lang === "ar" ? "العنوان بالتفصيل *" : "Detailed Address *"} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" />
+              <label className="text-xs font-light text-stone-400 tracking-wider block">
+                {lang === "ar" ? "بيانات التوصيل" : "DELIVERY DETAILS"}
+              </label>
+              <input 
+                type="text" 
+                placeholder={lang === "ar" ? "الاسم بالكامل *" : "Full Name *"} 
+                value={customerName} 
+                onChange={(e) => setCustomerName(e.target.value)} 
+                className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" 
+              />
+              <input 
+                type="text" 
+                placeholder={lang === "ar" ? "العنوان بالتفصيل *" : "Detailed Address *"} 
+                value={customerAddress} 
+                onChange={(e) => setCustomerAddress(e.target.value)} 
+                className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" 
+              />
               <div className="grid grid-cols-2 gap-2">
-                <input type="tel" placeholder={lang === "ar" ? "رقم هاتف 1 *" : "Phone 1 *"} value={phone1} onChange={(e) => setPhone1(e.target.value)} className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" />
-                <input type="tel" placeholder={lang === "ar" ? "رقم هاتف 2 (اختياري)" : "Phone 2 (Optional)"} value={phone2} onChange={(e) => setPhone2(e.target.value)} className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" />
+                <input 
+                  type="tel" 
+                  placeholder={lang === "ar" ? "رقم هاتف 1 *" : "Phone 1 *"} 
+                  value={phone1} 
+                  onChange={(e) => setPhone1(e.target.value)} 
+                  className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" 
+                />
+                <input 
+                  type="tel" 
+                  placeholder={lang === "ar" ? "رقم هاتف 2 (اختياري)" : "Phone 2 (Optional)"} 
+                  value={phone2} 
+                  onChange={(e) => setPhone2(e.target.value)} 
+                  className="w-full bg-stone-900/50 border border-white/[0.04] rounded-lg py-2 px-3 text-xs text-stone-200 focus:outline-none focus:border-amber-500/50" 
+                />
               </div>
             </div>
 
-            {/* طريقة الدفع المفصولة تماماً ومظبوطة */}
+            {/* طريقة الدفع المفصولة والمحمية من أي لخبطة أسماء الـ state */}
             <div className="space-y-2">
-              <label className="text-xs font-light text-stone-400 tracking-wider block">{lang === "ar" ? "طريقة الدفع" : "PAYMENT METHOD"}</label>
+              <label className="text-xs font-light text-stone-400 tracking-wider block">
+                {lang === "ar" ? "طريقة الدفع" : "PAYMENT METHOD"}
+              </label>
               <div className="grid grid-cols-2 gap-3">
+                {/* زرار الكاش */}
                 <button 
                   type="button"
                   onClick={() => updatePaymentMethod("cash")} 
-                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${paymentMethod === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${
+                    paymentMethod === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
+                  }`}
                 >
                   <Banknote className="h-4 w-4" />
                   <span>{lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery"}</span>
                 </button>
+                {/* زرار إنستا باي */}
                 <button 
                   type="button"
                   onClick={() => updatePaymentMethod("online")} 
-                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${paymentMethod === "online" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${
+                    isOnlineSelected ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
+                  }`}
                 >
                   <CreditCard className="h-4 w-4" />
-                  <span>{lang === "ar" ? "إنستا باي" : "InstaPay"}</span>
+                  <span>{lang === "ar" ? "إنستا باي" : "InstaPay / Cash"}</span>
                 </button>
               </div>
             </div>
 
-            {/* سيكشن الدفع المباشر والرفع السحري (يظهر فقط مع إنستا باي) */}
-            {paymentMethod === "online" && (
+            {/* سيكشن النسخ والتحويل والرفع التلقائي لإنستا باي */}
+            {isOnlineSelected && (
               <div className="p-3 rounded-xl bg-amber-500/[0.02] border border-amber-500/10 space-y-3">
                 
-                {/* زرار التحويل الذكي */}
+                {/* زرار التحويل الخارجي اللحظي */}
                 <button
                   type="button"
                   onClick={handleOpenInstaPay}
@@ -220,16 +270,26 @@ export default function CartDrawer({ isOpen, onClose }) {
                   {isCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-amber-500" />}
                   <span>
                     {isCopied 
-                      ? (lang === "ar" ? "تم نسخ الرقم وفتح التطبيق! ✅" : "Number Copied & App Opening! ✅") 
-                      : (lang === "ar" ? "اضغط هنا للتحويل وفتح InstaPay 🚀" : "Click to transfer & open InstaPay 🚀")}
+                      ? (lang === "ar" ? "تم نسخ الرقم بنجاح! ✅" : "Number Copied Successfully! ✅") 
+                      : (lang === "ar" ? "اضغط لنسخ الرقم وفتح تطبيق InstaPay 🚀" : "Click to copy number & open InstaPay 🚀")}
                   </span>
                 </button>
 
+                {/* صندوق عرض الرقم صريحاً كدعم إضافي للمستخدم */}
+                <div className="text-center bg-stone-900/40 p-2 rounded-lg border border-white/[0.02]">
+                  <p className="text-[11px] text-amber-500/90 font-mono font-medium tracking-wider select-all">
+                    {myInstaPayNumber}
+                  </p>
+                  <p className="text-[9px] text-stone-500 mt-1">
+                    {lang === "ar" ? "(اضغط على الزرار بالأعلى لنسخ الرقم فوراً)" : "(Click button above to copy instantly)"}
+                  </p>
+                </div>
+
                 <p className="text-[10px] font-light text-stone-500 text-center">
-                  {lang === "ar" ? "بعد إتمام التحويل، خذ لقطة شاشة وارفعها في الأسفل 👇" : "After transfer, take a screenshot and upload below 👇"}
+                  {lang === "ar" ? "بعد إتمام التحويل، خذ لقطة شاشة وارفعها هنا 👇" : "After transfer, take a screenshot and upload here 👇"}
                 </p>
 
-                {/* حقل رفع الإسكرين بعد المعاينة */}
+                {/* حقل الرفع والمعاينة للإسكرين */}
                 <label className="flex flex-col items-center justify-center border border-dashed border-white/[0.08] hover:border-amber-500/40 rounded-xl p-4 cursor-pointer transition-colors bg-stone-900/40">
                   <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                   
@@ -244,25 +304,26 @@ export default function CartDrawer({ isOpen, onClose }) {
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 text-stone-500">
                       <ImageIcon className="h-5 w-5 stroke-[1.5]" />
-                      <span className="text-[11px]">{lang === "ar" ? "ارفع إسكرين التحويل هنا" : "Upload Screenshot here"}</span>
+                      <span className="text-[11px]">{lang === "ar" ? "اضغط هنا لرفع الصورة" : "Click here to upload image"}</span>
                     </div>
                   )}
                 </label>
               </div>
             )}
 
-            {/* الإجمالي وزر الإرسال */}
+            {/* المجموع الكلي وعملة السعر */}
             <div className="flex items-center justify-between text-sm pt-1">
               <span className="text-stone-400 font-light">{lang === "ar" ? "المجموع الإجمالي:" : "Subtotal:"}</span>
               <span className="text-base font-inter font-semibold text-amber-500">{cartTotal} {lang === "ar" ? "ج.م" : "EGP"}</span>
             </div>
 
+            {/* زرار الأكشن النهائي المربوط بالسوبابيز والواتساب */}
             <button
               onClick={handleCheckout}
               disabled={isUploading}
               className="w-full rounded-xl bg-amber-500 py-3.5 text-xs font-normal tracking-widest text-black uppercase transition-all duration-300 hover:bg-white disabled:bg-stone-700 disabled:text-stone-400"
             >
-              {isUploading ? (lang === "ar" ? "جاري تسجيل الطلب ورفع الملف..." : "Saving Order...") : (lang === "ar" ? "تأكيد وإرسال الطلب" : "Confirm & Send Order")}
+              {isUploading ? (lang === "ar" ? "جاري تسجيل طلبك ورفع الإسكرين..." : "Saving Order...") : (lang === "ar" ? "تأكيد وإرسال الطلب" : "Confirm & Send Order")}
             </button>
           </div>
         )}

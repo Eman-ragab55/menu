@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useCart } from "@/src/context/CartContext";
 import { useLang } from "@/src/context/LangContext";
 import { menuData } from "@/src/data/menuData";
@@ -19,6 +19,20 @@ export default function CartDrawer({ isOpen, onClose }) {
   } = useCart();
   const { lang } = useLang();
 
+  // State محلية للتحكم الفوري في إظهار فورم الدفع لتفادي مشاكل الـ Context
+  const [localPayment, setLocalPayment] = useState("cash");
+
+  // مزامنة الحالة أول ما الـ Drawer يفتح
+  useEffect(() => {
+    if (paymentMethod) {
+      if (paymentMethod === "online" || paymentMethod === "InstaPay / Cash") {
+        setLocalPayment("online");
+      } else {
+        setLocalPayment("cash");
+      }
+    }
+  }, [paymentMethod]);
+
   // states لبيانات العميل
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -33,10 +47,9 @@ export default function CartDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // رقم الحساب أو الموبايل الخاص بإنستا باي
-  const myInstaPayNumber = "01273216946";
+  // 💡 تم تحديث رقم إنستا باي الجديد هنا
+  const myInstaPayNumber = "01200417433";
 
-  // دالة التعامل مع اختيار ملف الصورة
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -45,17 +58,13 @@ export default function CartDrawer({ isOpen, onClose }) {
     }
   };
 
-  // دالة نسخ الرقم تلقائياً وفتح تطبيق إنستا باي للتحويل السريع
   const handleOpenInstaPay = () => {
     navigator.clipboard.writeText(myInstaPayNumber);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 3000);
-
-    // محاولة فتح التطبيق مباشرة عبر الـ Deep Link
     window.location.href = "instapay://";
   };
 
-  // دالة الحفظ في سوبابيز ثم فتح الواتساب
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
@@ -64,10 +73,10 @@ export default function CartDrawer({ isOpen, onClose }) {
       return;
     }
 
-    // التحقق من رفع الصورة لو العميل اختار إنستا باي
-    const isOnline = paymentMethod === "online" || paymentMethod === "InstaPay / Cash";
+    // 🔒 شرط الأمان الصارم: لو اختار أونلاين ومفيش ملف صورة، الكود هيقف هنا تماماً ومش هيكمل للواتساب
+    const isOnline = localPayment === "online";
     if (isOnline && !screenshotFile) {
-      alert(lang === "ar" ? "برجاء رفع إسكرين تحويل إنستا باي لتأكيد الطلب!" : "Please upload the InstaPay transfer screenshot!");
+      alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
       return;
     }
 
@@ -75,27 +84,29 @@ export default function CartDrawer({ isOpen, onClose }) {
       setIsUploading(true);
       let screenshotUrl = null;
 
-      // 1️⃣ رفع الصورة للـ Supabase Storage Bucket
       if (isOnline && screenshotFile) {
-        const fileExt = screenshotFile.name.split('.').pop();
+        const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // رفع ملف الصورة إلى الـ Storage
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
           .from('screenshots')
-          .upload(fileName, screenshotFile);
+          .upload(fileName, screenshotFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: screenshotFile.type 
+          });
 
         if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage
-          .from('screenshots')
-          .getPublicUrl(fileName);
-          
-        screenshotUrl = publicUrlData.publicUrl;
+        // بناء الرابط العام
+        screenshotUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/screenshots/${fileName}`;
       }
 
-      // 2️⃣ إدخال الأوردر في جدول الـ orders بالداتابيز
+      // إدخال البيانات في الداتابيز
       const { error: orderError } = await supabase
-        .from('orders')
+        .from('screenshots')
         .insert([
           {
             customer_name: customerName,
@@ -111,7 +122,6 @@ export default function CartDrawer({ isOpen, onClose }) {
 
       if (orderError) throw orderError;
 
-      // 3️⃣ بناء رسالة الواتساب وتوجيه العميل للمتابعة اللحظية
       let paymentText = lang === "ar"
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
@@ -133,15 +143,10 @@ export default function CartDrawer({ isOpen, onClose }) {
     }
   };
 
-  // لتحديد هل السيكشن المالي مفتوح أم لا بناء على قيمة الـ state عندك
-  const isOnlineSelected = paymentMethod === "online" || paymentMethod === "InstaPay / Cash";
-
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* الخلفية المضببة الشفافة */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* لوحة السلة الجانبية الفخمة المتناسقة مع Ayla */}
       <div className={`fixed top-0 bottom-0 w-full max-w-md bg-[#0d0d0d] border-stone-800 p-6 flex flex-col justify-between shadow-2xl transition-transform duration-300 overflow-y-auto ${
         lang === "ar" ? "left-0 border-r" : "right-0 border-l"
       }`}>
@@ -158,12 +163,12 @@ export default function CartDrawer({ isOpen, onClose }) {
         </div>
 
         {/* قائمة المنتجات في السلة */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-none max-h-[30vh]">
+        <div className="flex-1 overflow-y-auto py-4 space-y-4 scrollbar-none max-h-[25vh]">
           {cartItems.map((item) => (
             <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.01] border border-white/[0.03]">
               <div className="flex-1 min-w-0 pr-2">
                 <h4 className="text-sm font-light text-stone-200 truncate">{item.name[lang] || item.name}</h4>
-                <p className="text-xs text-amber-500/80 font-inter mt-1">
+                <p className="text-xs text-amber-500/80 font-inter mt-1 font-medium">
                   {item.price * item.quantity} {lang === "ar" ? "ج.م" : "EGP"}
                 </p>
               </div>
@@ -185,7 +190,7 @@ export default function CartDrawer({ isOpen, onClose }) {
           ))}
         </div>
 
-        {/* سيكشن الدفع والفواتير والبيانات كاملة */}
+        {/* سيكشن الدفع والبيانات */}
         {cartItems.length > 0 && (
           <div className="pt-4 border-t border-white/[0.05] space-y-4">
             
@@ -226,29 +231,33 @@ export default function CartDrawer({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* طريقة الدفع المفصولة والمحمية من أي لخبطة أسماء الـ state */}
+            {/* طريقة الدفع */}
             <div className="space-y-2">
               <label className="text-xs font-light text-stone-400 tracking-wider block">
                 {lang === "ar" ? "طريقة الدفع" : "PAYMENT METHOD"}
               </label>
               <div className="grid grid-cols-2 gap-3">
-                {/* زرار الكاش */}
                 <button 
                   type="button"
-                  onClick={() => updatePaymentMethod("cash")} 
+                  onClick={() => {
+                    setLocalPayment("cash");
+                    if(typeof updatePaymentMethod === 'function') updatePaymentMethod("cash");
+                  }} 
                   className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${
-                    paymentMethod === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
+                    localPayment === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
                   }`}
                 >
                   <Banknote className="h-4 w-4" />
                   <span>{lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery"}</span>
                 </button>
-                {/* زرار إنستا باي */}
                 <button 
                   type="button"
-                  onClick={() => updatePaymentMethod("online")} 
+                  onClick={() => {
+                    setLocalPayment("online");
+                    if(typeof updatePaymentMethod === 'function') updatePaymentMethod("online");
+                  }} 
                   className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${
-                    isOnlineSelected ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
+                    localPayment === "online" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"
                   }`}
                 >
                   <CreditCard className="h-4 w-4" />
@@ -257,11 +266,9 @@ export default function CartDrawer({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* سيكشن النسخ والتحويل والرفع التلقائي لإنستا باي */}
-            {isOnlineSelected && (
+            {/* سيكشن إنستا باي والرفع */}
+            {localPayment === "online" && (
               <div className="p-3 rounded-xl bg-amber-500/[0.02] border border-amber-500/10 space-y-3">
-                
-                {/* زرار التحويل الخارجي اللحظي */}
                 <button
                   type="button"
                   onClick={handleOpenInstaPay}
@@ -275,24 +282,18 @@ export default function CartDrawer({ isOpen, onClose }) {
                   </span>
                 </button>
 
-                {/* صندوق عرض الرقم صريحاً كدعم إضافي للمستخدم */}
                 <div className="text-center bg-stone-900/40 p-2 rounded-lg border border-white/[0.02]">
                   <p className="text-[11px] text-amber-500/90 font-mono font-medium tracking-wider select-all">
                     {myInstaPayNumber}
                   </p>
-                  <p className="text-[9px] text-stone-500 mt-1">
-                    {lang === "ar" ? "(اضغط على الزرار بالأعلى لنسخ الرقم فوراً)" : "(Click button above to copy instantly)"}
-                  </p>
                 </div>
 
                 <p className="text-[10px] font-light text-stone-500 text-center">
-                  {lang === "ar" ? "بعد إتمام التحويل، خذ لقطة شاشة وارفعها هنا 👇" : "After transfer, take a screenshot and upload here 👇"}
+                  {lang === "ar" ? "بعد إتمام التحويل، يجب رفع لقطة الشاشة هنا لتفعيل زر الإرسال 👇" : "After transfer, you must upload the screenshot here to enable sending 👇"}
                 </p>
 
-                {/* حقل الرفع والمعاينة للإسكرين */}
                 <label className="flex flex-col items-center justify-center border border-dashed border-white/[0.08] hover:border-amber-500/40 rounded-xl p-4 cursor-pointer transition-colors bg-stone-900/40">
                   <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                  
                   {screenshotPreview ? (
                     <div className="relative w-full h-24 rounded-lg overflow-hidden border border-white/[0.05]">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -304,20 +305,20 @@ export default function CartDrawer({ isOpen, onClose }) {
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 text-stone-500">
                       <ImageIcon className="h-5 w-5 stroke-[1.5]" />
-                      <span className="text-[11px]">{lang === "ar" ? "اضغط هنا لرفع الصورة" : "Click here to upload image"}</span>
+                      <span className="text-[11px]">{lang === "ar" ? "اضغط هنا لرفع الصورة *" : "Click here to upload image *"}</span>
                     </div>
                   )}
                 </label>
               </div>
             )}
 
-            {/* المجموع الكلي وعملة السعر */}
+            {/* المجموع الكلي */}
             <div className="flex items-center justify-between text-sm pt-1">
               <span className="text-stone-400 font-light">{lang === "ar" ? "المجموع الإجمالي:" : "Subtotal:"}</span>
               <span className="text-base font-inter font-semibold text-amber-500">{cartTotal} {lang === "ar" ? "ج.م" : "EGP"}</span>
             </div>
 
-            {/* زرار الأكشن النهائي المربوط بالسوبابيز والواتساب */}
+            {/* زرار الإرسال */}
             <button
               onClick={handleCheckout}
               disabled={isUploading}

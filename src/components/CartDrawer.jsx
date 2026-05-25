@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { useCart } from "@/src/context/CartContext";
 import { useLang } from "@/src/context/LangContext";
 import { menuData } from "@/src/data/menuData";
-import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, User, MapPin, Phone, Upload, ImageIcon } from "lucide-react";
+import { supabase } from "@/src/utils/supabaseClient"; // ملف السوبابيز اللي عملناه
+import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, ImageIcon, Copy, Check } from "lucide-react";
 
 export default function CartDrawer({ isOpen, onClose }) {
   const { 
@@ -18,30 +19,44 @@ export default function CartDrawer({ isOpen, onClose }) {
   } = useCart();
   const { lang } = useLang();
 
-  // الـ States الخاصة ببيانات العميل
+  // بيانات العميل
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [phone1, setPhone1] = useState("");
   const [phone2, setPhone2] = useState("");
   
-  // الـ States الجديدة الخاصة برفع إسكرين التحويل
+  // رفع الإسكرين
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
-  // دالة التعامل مع اختيار الصورة وعمل المعاينة (Preview)
+  if (!isOpen) return null;
+
+  // رقم إنستا باي الخاص بيكِ
+  const myInstaPayNumber = "01273216946";
+
+  // دالة التعامل مع اختيار صورة الإسكرين
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setScreenshotFile(file);
-      // عمل رابط مؤقت لعرض الصورة جوه المتصفح للعميل
       setScreenshotPreview(URL.createObjectURL(file));
     }
   };
 
-  if (!isOpen) return null;
+  // دالة النسخ التلقائي وفتح تطبيق إنستا باي فوراً
+  const handleOpenInstaPay = () => {
+    // 1️⃣ نسخ الرقم في الحافظة (Clipboard) تلقائياً لتسهيل التجربة
+    navigator.clipboard.writeText(myInstaPayNumber);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 3000);
 
-  // فُانكشن إرسال الطلب (هنا هنربط الـ Database مستقبلاً)
+    // 2️⃣ فتح تطبيق إنستا باي الموبايل مباشرة عن طريق الـ Deep Link
+    window.location.href = "instapay://";
+  };
+
+  // دالة تأكيد الأوردر وحفظه في الـ Database
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
@@ -50,7 +65,6 @@ export default function CartDrawer({ isOpen, onClose }) {
       return;
     }
 
-    // إذا اختار إنستا باي ولم يرفع الإسكرين، نبهه (ممكن تخليها إجباري أو اختياري)
     if (paymentMethod === "online" && !screenshotFile) {
       alert(lang === "ar" ? "برجاء رفع إسكرين تحويل إنستا باي لتأكيد الطلب!" : "Please upload the InstaPay transfer screenshot!");
       return;
@@ -58,33 +72,52 @@ export default function CartDrawer({ isOpen, onClose }) {
 
     try {
       setIsUploading(true);
+      let screenshotUrl = null;
 
-      // 1️⃣ [هنا في الخطوة الجاية]: كود رفع الصورة للـ Storage وكتابة الأوردر في الـ Database
-      let finalScreenshotUrl = "https://placeholder-link.com/image.jpg"; // لينك تجريبي مؤقتاً
-      
-      console.log("Saving Order to Database...", {
-        customerName,
-        customerAddress,
-        phone1,
-        phone2,
-        cartItems,
-        cartTotal,
-        paymentMethod,
-        screenshotUrl: finalScreenshotUrl
-      });
+      // 1️⃣ رفع الإسكرين إلى Supabase Storage لو الدفع أونلاين
+      if (paymentMethod === "online" && screenshotFile) {
+        const fileExt = screenshotFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(fileName, screenshotFile);
 
-      // 2️⃣ بناء نص رسالة الواتساب التقليدية للمتابعة
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('screenshots')
+          .getPublicUrl(fileName);
+          
+        screenshotUrl = publicUrlData.publicUrl;
+      }
+
+      // 2️⃣ حفظ البيانات كاملة في الـ Database (جدول orders)
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert([
+          {
+            customer_name: customerName,
+            customer_address: customerAddress,
+            phone1: phone1,
+            phone2: phone2 || null,
+            payment_method: paymentMethod,
+            cart_items: cartItems, 
+            cart_total: cartTotal,
+            screenshot_url: screenshotUrl
+          }
+        ]);
+
+      if (orderError) throw orderError;
+
+      // 3️⃣ توجيه العميل للواتساب للمتابعة الشات مع المطعم
       let paymentText = lang === "ar"
-        ? (paymentMethod === "online" ? "📱 إنستا باي (تم رفع الإسكرين للسيستم)" : "💵 كاش عند الاستلام")
-        : (paymentMethod === "online" ? "📱 InstaPay (Screenshot Uploaded)" : "💵 Cash on Delivery");
+        ? (paymentMethod === "online" ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
+        : (paymentMethod === "online" ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
       let message = lang === "ar" 
-        ? `*طلب جديد من Ayla Experience* 🌟\n\n`
-        : `*New Order from Ayla Experience* 🌟\n\n`;
-
-      message += lang === "ar"
-        ? `*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 جاري مراجعة الطلب والإسكرين من لوحة التحكم الخاصة بالمطعم.*`
-        : `*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order & Screenshot are being reviewed from the Restaurant Dashboard.*`;
+        ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تم تسجيل الأوردر بنجاح في نظام المطعم وجاري مراجعته!*`
+        : `*New Order from Ayla Experience* 🌟\n\n*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order saved successfully and is being reviewed!*`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${menuData.whatsappNumber}?text=${encodedMessage}`;
@@ -94,6 +127,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
     } catch (error) {
       console.error("Error creating order:", error);
+      alert(lang === "ar" ? "حدث خطأ أثناء حفظ الطلب، حاول مرة أخرى." : "Error creating order, please try again.");
       setIsUploading(false);
     }
   };
@@ -150,23 +184,52 @@ export default function CartDrawer({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* طريقة الدفع */}
+            {/* طريقة الدفع المفصولة تماماً ومظبوطة */}
             <div className="space-y-2">
               <label className="text-xs font-light text-stone-400 tracking-wider block">{lang === "ar" ? "طريقة الدفع" : "PAYMENT METHOD"}</label>
               <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => updatePaymentMethod("cash")} className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all ${paymentMethod === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}><Banknote className="h-4 w-4" /><span>{lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery"}</span></button>
-                <button onClick={() => updatePaymentMethod("online")} className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all ${paymentMethod === "online" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}><CreditCard className="h-4 w-4" /><span>{lang === "ar" ? "إنستا باي" : "InstaPay"}</span></button>
+                <button 
+                  type="button"
+                  onClick={() => updatePaymentMethod("cash")} 
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${paymentMethod === "cash" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}
+                >
+                  <Banknote className="h-4 w-4" />
+                  <span>{lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery"}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => updatePaymentMethod("online")} 
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs transition-all duration-300 ${paymentMethod === "online" ? "border-amber-500 bg-amber-500/[0.06] text-amber-500" : "border-white/[0.03] text-stone-400"}`}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  <span>{lang === "ar" ? "إنستا باي" : "InstaPay"}</span>
+                </button>
               </div>
             </div>
 
-            {/* سيكشن رفع الصورة المطور (يظهر فقط مع إنستا باي) */}
+            {/* سيكشن الدفع المباشر والرفع السحري (يظهر فقط مع إنستا باي) */}
             {paymentMethod === "online" && (
               <div className="p-3 rounded-xl bg-amber-500/[0.02] border border-amber-500/10 space-y-3">
-                <p className="text-[11px] font-light text-stone-400 text-center">
-                  {lang === "ar" ? "حول للحساب: 01273216946 ثم ارفع الإسكرين هنا 👇" : "Transfer to: 01273216946 then upload screenshot 👇"}
+                
+                {/* زرار التحويل الذكي */}
+                <button
+                  type="button"
+                  onClick={handleOpenInstaPay}
+                  className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 border border-white/[0.05] text-[11px] text-stone-200 py-2.5 rounded-lg font-light transition-colors"
+                >
+                  {isCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-amber-500" />}
+                  <span>
+                    {isCopied 
+                      ? (lang === "ar" ? "تم نسخ الرقم وفتح التطبيق! ✅" : "Number Copied & App Opening! ✅") 
+                      : (lang === "ar" ? "اضغط هنا للتحويل وفتح InstaPay 🚀" : "Click to transfer & open InstaPay 🚀")}
+                  </span>
+                </button>
+
+                <p className="text-[10px] font-light text-stone-500 text-center">
+                  {lang === "ar" ? "بعد إتمام التحويل، خذ لقطة شاشة وارفعها في الأسفل 👇" : "After transfer, take a screenshot and upload below 👇"}
                 </p>
 
-                {/* حقل الرفع المخفي الشيك */}
+                {/* حقل رفع الإسكرين بعد المعاينة */}
                 <label className="flex flex-col items-center justify-center border border-dashed border-white/[0.08] hover:border-amber-500/40 rounded-xl p-4 cursor-pointer transition-colors bg-stone-900/40">
                   <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                   
@@ -181,7 +244,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                   ) : (
                     <div className="flex flex-col items-center gap-1.5 text-stone-500">
                       <ImageIcon className="h-5 w-5 stroke-[1.5]" />
-                      <span className="text-[11px]">{lang === "ar" ? "اختر صورة الإسكرين" : "Upload Screenshot"}</span>
+                      <span className="text-[11px]">{lang === "ar" ? "ارفع إسكرين التحويل هنا" : "Upload Screenshot here"}</span>
                     </div>
                   )}
                 </label>
@@ -199,7 +262,7 @@ export default function CartDrawer({ isOpen, onClose }) {
               disabled={isUploading}
               className="w-full rounded-xl bg-amber-500 py-3.5 text-xs font-normal tracking-widest text-black uppercase transition-all duration-300 hover:bg-white disabled:bg-stone-700 disabled:text-stone-400"
             >
-              {isUploading ? (lang === "ar" ? "جاري تسجيل الطلب..." : "Saving Order...") : (lang === "ar" ? "تأكيد وإرسال الطلب" : "Confirm & Send Order")}
+              {isUploading ? (lang === "ar" ? "جاري تسجيل الطلب ورفع الملف..." : "Saving Order...") : (lang === "ar" ? "تأكيد وإرسال الطلب" : "Confirm & Send Order")}
             </button>
           </div>
         )}

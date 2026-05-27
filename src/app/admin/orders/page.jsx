@@ -1,5 +1,5 @@
 "use client";
-
+export const dynamic = "force-dynamic";
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/src/utils/supabaseClient"; // اتأكدي من صحة المسار حسب فولدراتك
 import { ShoppingBag, User, MapPin, Phone, CreditCard, Banknote, Calendar, Eye, X, RefreshCw } from "lucide-react";

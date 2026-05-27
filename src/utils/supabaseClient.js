@@ -1,12 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// دالة تجلب القيم الحقيقية لايف أو ترجع الـ placeholder وقت الـ Build فقط
+const getSupabaseConfig = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// حماية مطلقة للـ Build Worker: لو القيم مش جاهزة أو مش صالحة وقت الـ Build، بنباصي روابط وهمية سليمة الشكل
-const isUrlValid = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.startsWith('https://'))
+  // إذا كنا جوه المتصفح (Client-side) أو المتغيرات الحقيقية موجودة، استخدميها فوراً
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    return { url, key }
+  }
 
-export const supabase = createClient(
-  isUrlValid ? supabaseUrl : 'https://placeholder-project.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key'
-)
+  // قيم وهمية فقط عشان الـ Build Worker يعدي بسلام وميضربش
+  return {
+    url: 'https://placeholder-project.supabase.co',
+    key: 'placeholder-anon-key'
+  }
+}
+
+const config = getSupabaseConfig()
+
+export const supabase = createClient(config.url, config.key)

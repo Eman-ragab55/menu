@@ -4,8 +4,16 @@ import React, { useState, useEffect } from "react";
 import { useCart } from "@/src/context/CartContext";
 import { useLang } from "@/src/context/LangContext";
 import { menuData } from "@/src/data/menuData";
-import { supabase } from "@/src/utils/supabaseClient"; 
 import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, ImageIcon, Copy, Check } from "lucide-react";
+
+// 🛠️ حقن الـ Supabase Client مباشرة داخل الملف لإنهاء مشكلة الـ Placeholder نهائياً
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co";
+// ⚠️ ضعي الـ Anon Key الحقيقي الخاص بمشروعك (المفتاح الطويل الذي يبدأ بـ eyJ) بين علامتي التنصيص بالأسفل:
+const supabaseAnonKey = "حطي_هنا_الـ_Anon_Key_الحقيقي_بتاعك_الطويل";
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function CartDrawer({ isOpen, onClose }) {
   const { 
@@ -47,7 +55,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // 💡 تم تحديث رقم إنستا باي الجديد هنا
+  // 💡 رقم إنستا باي الجديد الخاص بكِ
   const myInstaPayNumber = "01200417433";
 
   const handleFileChange = (e) => {
@@ -88,7 +96,7 @@ export default function CartDrawer({ isOpen, onClose }) {
         const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-        // رفع ملف الصورة إلى الـ Storage
+        // رفع ملف الصورة إلى الـ Storage للـ bucket المسمى screenshots
         const { data: uploadData, error: uploadError } = await supabase
           .storage
           .from('screenshots')
@@ -100,11 +108,11 @@ export default function CartDrawer({ isOpen, onClose }) {
 
         if (uploadError) throw uploadError;
 
-        // بناء الرابط العام
-        screenshotUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/screenshots/${fileName}`;
+        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
+        screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
       }
 
-      // إدخال البيانات في الداتابيز
+      // إدخال البيانات في الداتابيز في جدول screenshots
       const { error: orderError } = await supabase
         .from('screenshots')
         .insert([
@@ -318,7 +326,7 @@ export default function CartDrawer({ isOpen, onClose }) {
               <span className="text-base font-inter font-semibold text-amber-500">{cartTotal} {lang === "ar" ? "ج.م" : "EGP"}</span>
             </div>
 
-            {/* زرار الإرسال */}
+            {/* زرار الإرسال المعزز */}
             <button
               onClick={handleCheckout}
               disabled={isUploading}

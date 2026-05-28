@@ -10,10 +10,11 @@ import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, Imag
 import { createClient } from '@supabase/supabase-js';
 
 // 🛑 المفاتيح الرسمية والنظيفة بعد ما نسخنا الـ JWT الأصلي
+// 🛑 المفاتيح الرسمية والنظيفة من تبويب Legacy
 const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co".trim();
 
-// 👇 استبدلي النص اللي بالداخل فوراً بالمفتاح الحقيقي اللي بيبدأ بـ eyJ بالكامل
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwemRuY2h2Z3V5eHFpcHhia2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM1NzUsImV4cCI6MjA5NTMwOTU3NX0.daY2mYWKDw2nkLfvZUDw1IVUi2Dx6AONMYwVov02Tjkا".trim();
+// 💡 كتابة المفتاح الصافي مباشرة بدون متغيرات وبدون أي حروف زيادة
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwemRuY2h2Z3V5eHFpcHhia2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM1NzUsImV4cCI6MjA5NTMwOTU3NX0.daY2mYWKDw2nkLfvZUDw1IVUi2Dx6AONMYwVov02Tjk";
 
 // ✅ تفعيل الـ Client القياسي النظيف وضخ الهيدرز الأصلية جواه صح
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {

@@ -9,11 +9,24 @@ import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, Imag
 // 🛠️ حقن الـ Supabase Client مباشرة داخل الملف لإنهاء مشكلة الـ Placeholder نهائياً
 import { createClient } from '@supabase/supabase-js';
 
-// 🛠️ تنظيف وحقن المفاتيح مباشرة لضمان عدم حدوث إيرور الـ Headers
+// 🛠️ تنظيف وحقن المفاتيح مباشرة لضمان عدم حدوث إيرور الـ Headers وتوافقها مع الـ Self-Hosted JWS
 const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co".trim();
 const supabaseAnonKey = "sb_publishable_2dqy00XlWZlWx4LeyAB_zQ_RDBxT8ay".trim();
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// ✅ إجبار الـ SDK على تمرير المفاتيح كـ Global Headers لتفادي إيرور Invalid Compact JWS في الـ Storage
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: {
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${supabaseAnonKey}`
+    }
+  }
+});
 
 export default function CartDrawer({ isOpen, onClose }) {
   const { 
@@ -55,7 +68,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // 💡 رقم إنستا باي الجديد الخاص بكِ
+  // 💡 رقم إنستا باي الخاص بكِ
   const myInstaPayNumber = "01200417433";
 
   const handleFileChange = (e) => {
@@ -81,7 +94,7 @@ export default function CartDrawer({ isOpen, onClose }) {
       return;
     }
 
-    // 🔒 شرط الأمان الصارم: لو اختار أونلاين ومفيش ملف صورة، الكود هيقف هنا تماماً ومش هيكمل للواتساب
+    // 🔒 شرط الأمان الصارم المحدث
     const isOnline = localPayment === "online";
     if (isOnline && !screenshotFile) {
       alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
@@ -96,15 +109,15 @@ export default function CartDrawer({ isOpen, onClose }) {
         const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-// ✅ السطر الجديد الآمن والمضمون 100%
-const { data: uploadData, error: uploadError } = await supabase
-  .storage
-  .from('screenshots')
-  .upload(fileName, screenshotFile, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
-  });
+        // ✅ رفع آمن ومطهر الـ Content-Type تماماً للـ Storage
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('screenshots')
+          .upload(fileName, screenshotFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
+          });
 
         if (uploadError) throw uploadError;
 

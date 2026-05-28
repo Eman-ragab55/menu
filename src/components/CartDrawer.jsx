@@ -110,16 +110,23 @@ export default function CartDrawer({ isOpen, onClose }) {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
         // ✅ رفع آمن ومطهر الـ Content-Type تماماً للـ Storage
-        const { data: uploadData, error: uploadError } = await supabase
-          .storage
-          .from('screenshots')
-          .upload(fileName, screenshotFile, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
-          });
+// 🚀 البديل السحري: الرفع المباشر عبر الـ API الصافي لتخطي مشكلة الـ JWS
+const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
 
-        if (uploadError) throw uploadError;
+const response = await fetch(uploadUrl, {
+  method: 'POST',
+  headers: {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${supabaseAnonKey}`,
+    'Content-Type': fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
+  },
+  body: screenshotFile
+});
+
+if (!response.ok) {
+  const errorText = await response.text();
+  throw new Error(`Storage Upload Failed: ${errorText}`);
+}
 
         // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
         screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
@@ -135,7 +142,7 @@ export default function CartDrawer({ isOpen, onClose }) {
             phone1: phone1,
             phone2: phone2 || null,
             payment_method: isOnline ? "online" : "cash",
-            cart_items: cartItems, 
+            cart_items: JSON.stringify(cartItems), 
             cart_total: cartTotal,
             screenshot_url: screenshotUrl
           }

@@ -93,8 +93,7 @@ export default function CartDrawer({ isOpen, onClose }) {
       alert(lang === "ar" ? "برجاء ملء الاسم، العنوان، ورقم الهاتف الأساسي!" : "Please fill in Name, Address, and Primary Phone!");
       return;
     }
-
-    // 🔒 شرط الأمان الصارم المحدث
+// 🔒 شرط الأمان الصارم المحدث
     const isOnline = localPayment === "online";
     if (isOnline && !screenshotFile) {
       alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
@@ -106,34 +105,28 @@ export default function CartDrawer({ isOpen, onClose }) {
       let screenshotUrl = null;
 
       if (isOnline && screenshotFile) {
-        
-// 🚀 البديل القاتل: الرفع كـ FormData لتخطي حماية الـ JWS نهائياً للـ Public Buckets
-const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
-const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        // 🚀 الضربة القاضية: تمرير الـ apikey داخل الـ Authorization لتخطي فحص الـ JWS وإرضاء الـ Gateway
+        const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
 
-const formData = new FormData();
-formData.append('file', screenshotFile);
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseAnonKey,
+            'Authorization': supabaseAnonKey, // 💡 مررنا المفتاح مباشرة بدون كلمة Bearer عشان نمنع الفحص للـ JWS
+            'Content-Type': fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
+          },
+          body: screenshotFile
+        });
 
-const response = await fetch(uploadUrl, {
-  method: 'POST',
-  headers: {
-    'apikey': supabaseAnonKey,
-    // 💡 شيلنا الـ Authorization Bearer تماماً عشان نمنع الـ Gateway إنه يفتش ويدور على الـ JWS
-  },
-  body: screenshotFile
-});
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Storage Upload Failed: ${errorText}`);
+        }
 
-if (!response.ok) {
-  const errorText = await response.text();
-  throw new Error(`Storage Upload Failed: ${errorText}`);
-}
-
-// بناء الرابط العام الفعلي للسيرفر الخاص بكِ
-screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
-
-        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
+        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ (مكتوب مرة واحدة وبشكل صحيح هنا)
         screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
       }
 

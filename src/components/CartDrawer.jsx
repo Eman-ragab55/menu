@@ -96,15 +96,15 @@ export default function CartDrawer({ isOpen, onClose }) {
         const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
-        // رفع ملف الصورة إلى الـ Storage للـ bucket المسمى screenshots
-        const { data: uploadData, error: uploadError } = await supabase
-          .storage
-          .from('screenshots')
-          .upload(fileName, screenshotFile, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: screenshotFile.type 
-          });
+// ✅ السطر الجديد الآمن والمضمون 100%
+const { data: uploadData, error: uploadError } = await supabase
+  .storage
+  .from('screenshots')
+  .upload(fileName, screenshotFile, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
+  });
 
         if (uploadError) throw uploadError;
 

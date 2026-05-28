@@ -11,8 +11,9 @@ import { createClient } from '@supabase/supabase-js';
 
 // 🛑 المفاتيح الرسمية والنظيفة بعد ما نسخنا الـ JWT الأصلي
 const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co".trim();
-// انسخي المفتاح اللي بيبدأ بـ eyJ بالكامل وحطيه بين القوسين هنا 👇
-const supabaseAnonKey = "حطي_المفتاح_اللي_بيبدأ_بـ_eyJ_اللي_نسختيه_من_صفحة_API_Keys_هنا".trim();
+
+// 👇 استبدلي النص اللي بالداخل فوراً بالمفتاح الحقيقي اللي بيبدأ بـ eyJ بالكامل
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwemRuY2h2Z3V5eHFpcHhia2JrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzM1NzUsImV4cCI6MjA5NTMwOTU3NX0.daY2mYWKDw2nkLfvZUDw1IVUi2Dx6AONMYwVov02Tjkا".trim();
 
 // ✅ تفعيل الـ Client القياسي النظيف وضخ الهيدرز الأصلية جواه صح
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -87,7 +88,7 @@ export default function CartDrawer({ isOpen, onClose }) {
     window.location.href = "instapay://";
   };
 
- const handleCheckout = async () => {
+  const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
     if (!customerName || !customerAddress || !phone1) {
@@ -133,7 +134,6 @@ export default function CartDrawer({ isOpen, onClose }) {
       }
 
       // إدخال البيانات في الداتابيز في جدول screenshots
-      // 💡 تحويل cartItems لـ String احتياطياً لضمان التوافق المطلق مع نوع الحقل في الجدول
       const { error: orderError } = await supabase
         .from('screenshots')
         .insert([

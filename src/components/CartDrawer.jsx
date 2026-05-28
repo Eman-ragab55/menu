@@ -6,14 +6,15 @@ import { useLang } from "@/src/context/LangContext";
 import { menuData } from "@/src/data/menuData";
 import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, ImageIcon, Copy, Check } from "lucide-react";
 
-// 🛠️ حقن الـ Supabase Client مباشرة داخل الملف لإنهاء مشكلة الـ Placeholder نهائياً
+// 🛠️ حقن مكتبة Supabase للتأكد من إنها مسمعة في الملف
 import { createClient } from '@supabase/supabase-js';
 
-// 🛠️ تنظيف وحقن المفاتيح مباشرة لضمان عدم حدوث إيرور الـ Headers وتوافقها مع الـ Self-Hosted JWS
+// 🛑 المفاتيح الرسمية والنظيفة بعد ما نسخنا الـ JWT الأصلي
 const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co".trim();
-const supabaseAnonKey = "sb_publishable_2dqy00XlWZlWx4LeyAB_zQ_RDBxT8ay".trim();
+// انسخي المفتاح اللي بيبدأ بـ eyJ بالكامل وحطيه بين القوسين هنا 👇
+const supabaseAnonKey = "حطي_المفتاح_اللي_بيبدأ_بـ_eyJ_اللي_نسختيه_من_صفحة_API_Keys_هنا".trim();
 
-// ✅ إجبار الـ SDK على تمرير المفاتيح كـ Global Headers لتفادي إيرور Invalid Compact JWS في الـ Storage
+// ✅ تفعيل الـ Client القياسي النظيف وضخ الهيدرز الأصلية جواه صح
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: false,
@@ -23,7 +24,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'Authorization': `Bearer ${supabaseAnonKey}` // الحارس هيشوف الكارت الـ JWT هنا وهيفتح الباب فوراً
     }
   }
 });
@@ -86,14 +87,15 @@ export default function CartDrawer({ isOpen, onClose }) {
     window.location.href = "instapay://";
   };
 
-  const handleCheckout = async () => {
+ const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
     if (!customerName || !customerAddress || !phone1) {
       alert(lang === "ar" ? "برجاء ملء الاسم، العنوان، ورقم الهاتف الأساسي!" : "Please fill in Name, Address, and Primary Phone!");
       return;
     }
-// 🔒 شرط الأمان الصارم المحدث
+
+    // 🔒 شرط الأمان الصارم المحدث
     const isOnline = localPayment === "online";
     if (isOnline && !screenshotFile) {
       alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
@@ -105,17 +107,17 @@ export default function CartDrawer({ isOpen, onClose }) {
       let screenshotUrl = null;
 
       if (isOnline && screenshotFile) {
-        // 🚀 الضربة القاضية: تمرير الـ apikey داخل الـ Authorization لتخطي فحص الـ JWS وإرضاء الـ Gateway
         const fileExt = screenshotFile.name.split('.').pop().toLowerCase();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
 
+        // 🚀 الـ Fetch الشرعي والقياسي باستخدام الـ JWT الأصلي المنسوخ (eyJ...)
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'apikey': supabaseAnonKey,
-            'Authorization': supabaseAnonKey, // 💡 مررنا المفتاح مباشرة بدون كلمة Bearer عشان نمنع الفحص للـ JWS
+            'Authorization': `Bearer ${supabaseAnonKey}`, // 💡 تمرير الـ JWT الأصلي كـ Bearer لفتح حارس الـ Storage فوراً
             'Content-Type': fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
           },
           body: screenshotFile
@@ -126,11 +128,12 @@ export default function CartDrawer({ isOpen, onClose }) {
           throw new Error(`Storage Upload Failed: ${errorText}`);
         }
 
-        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ (مكتوب مرة واحدة وبشكل صحيح هنا)
+        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
         screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
       }
 
       // إدخال البيانات في الداتابيز في جدول screenshots
+      // 💡 تحويل cartItems لـ String احتياطياً لضمان التوافق المطلق مع نوع الحقل في الجدول
       const { error: orderError } = await supabase
         .from('screenshots')
         .insert([
@@ -140,7 +143,7 @@ export default function CartDrawer({ isOpen, onClose }) {
             phone1: phone1,
             phone2: phone2 || null,
             payment_method: isOnline ? "online" : "cash",
-            cart_items: cartItems, 
+            cart_items: typeof cartItems === 'object' ? JSON.stringify(cartItems) : cartItems, 
             cart_total: cartTotal,
             screenshot_url: screenshotUrl
           }

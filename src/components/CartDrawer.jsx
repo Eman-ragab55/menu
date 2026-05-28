@@ -9,9 +9,9 @@ import { X, Plus, Minus, Trash2, ShoppingBag, CreditCard, Banknote, Upload, Imag
 // 🛠️ حقن الـ Supabase Client مباشرة داخل الملف لإنهاء مشكلة الـ Placeholder نهائياً
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co";
-// ⚠️ ضعي الـ Anon Key الحقيقي الخاص بمشروعك (المفتاح الطويل الذي يبدأ بـ eyJ) بين علامتي التنصيص بالأسفل:
-const supabaseAnonKey = "حطي_هنا_الـ_Anon_Key_الحقيقي_بتاعك_الطويل";
+// 🛠️ تنظيف وحقن المفاتيح مباشرة لضمان عدم حدوث إيرور الـ Headers
+const supabaseUrl = "https://ppzdnchvguyxqipxbkbk.supabase.co".trim();
+const supabaseAnonKey = "sb_publishable_2dqy00XlWZlWx4LeyAB_zQ_RDBxT8ay".trim();
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

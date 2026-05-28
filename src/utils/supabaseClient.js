@@ -5,12 +5,15 @@ const getSupabaseConfig = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // إذا كنا جوه المتصفح (Client-side) أو المتغيرات الحقيقية موجودة، استخدميها فوراً
-  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-    return { url, key }
+  // إذا كنا جوه المتصفح (Client-side) أو المتغيرات الحقيقية مقروءة وموجودة بنجاح
+  if (url && (url.trim().startsWith('http://') || url.trim().startsWith('https://'))) {
+    return { 
+      url: url.trim(), 
+      key: key ? key.trim() : key 
+    }
   }
 
-  // قيم وهمية فقط عشان الـ Build Worker يعدي بسلام وميضربش
+  // قيم وهمية فقط عشان الـ Build Worker في Vercel يعدي بسلام وميضربش
   return {
     url: 'https://placeholder-project.supabase.co',
     key: 'placeholder-anon-key'

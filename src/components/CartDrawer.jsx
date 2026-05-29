@@ -156,9 +156,16 @@ export default function CartDrawer({ isOpen, onClose }) {
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
-// 1️⃣ السطرين دول هيلفوا على السلة ويجيبوا الأصناف والكمية والأسعار
-      const orderDetailsAr = cartItems?.map(item => `• ${item.name || item.title} (عدد: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} ج.م`).join('\n') || "";
-      const orderDetailsEn = cartItems?.map(item => `• ${item.name || item.title} (Qty: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} EGP`).join('\n') || "";
+const orderDetailsAr = cartItems?.map(item => {
+  // هنا بنقـفش الاسم لو كان نص، ولو كان Object بنجيب النص اللي جواه
+  const name = typeof item.name === 'object' ? (item.name.ar || item.name.en) : (typeof item.title === 'object' ? (item.title.ar || item.title.en) : (item.name || item.title || "صنف"));
+  return `• ${name} (عدد: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} ج.م`;
+}).join('\n') || "";
+
+const orderDetailsEn = cartItems?.map(item => {
+  const name = typeof item.name === 'object' ? (item.name.en || item.name.ar) : (typeof item.title === 'object' ? (item.title.en || item.title.ar) : (item.name || item.title || "Dish"));
+  return `• ${name} (Qty: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} EGP`;
+}).join('\n') || "";  
 
       // 2️⃣ الرسالة متزود عليها تفاصيل الأوردر والإجمالي
       let message = lang === "ar" 

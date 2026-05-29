@@ -149,22 +149,25 @@ try {
 
       if (orderError) throw orderError;
 
-      // 1️⃣ بناء نص تفاصيل الأوردر (الأطباق، الكميات، الأسعار) بناءً على اللغة
+      // 1️⃣ بناء نص تفاصيل الأوردر بأعلى حماية وأمان لمنع التهنيج
       let itemsText = "";
-      if (Array.isArray(cartItems)) {
+      if (cartItems && Array.isArray(cartItems)) {
         itemsText = cartItems.map(item => {
-          // ملحوظة: اتأكدي إن أسماء المتغيرات (item.name و item.quantity و item.price) مطابقة للي عندك في الـ state
+          if (!item) return "";
+          const name = item.name || item.title || item.label || "Dish";
+          const qty = item.quantity || 1;
+          const price = item.price || 0;
           return lang === "ar"
-            ? `• ${item.name || item.title} (عدد: ${item.quantity}) - بسعر: ${item.price * item.quantity} ج.م`
-            : `• ${item.name || item.title} (Qty: ${item.quantity}) - Price: ${item.price * item.quantity} EGP`;
-        }).join('\n');
+            ? `• ${name} (عدد: ${qty}) - بسعر: ${price * qty} ج.م`
+            : `• ${name} (Qty: ${qty}) - Price: ${price * qty} EGP`;
+        }).filter(Boolean).join('\n');
       }
 
       let paymentText = lang === "ar"
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
-      // 2️⃣ صياغة الرسالة الكاملة (بيانات العميل + تفاصيل الأكل بالملي)
+      // 2️⃣ صياغة الرسالة الكاملة
       let message = lang === "ar" 
         ? `*طلب جديد من Ayla Experience* 🌟\n\n` +
           `*👤 بيانات العميل:*\n` +
@@ -192,7 +195,7 @@ try {
 
       setIsUploading(false);
 
-      // 🚀 3️⃣ الحل السحري المتوافق مع سفاري وكروم وباقي المتصفحات لفتح الرابط مباشرة
+      // الـ Redirect المتوافق مع سفاري وكروم
       window.location.href = whatsappUrl;
 
     } catch (error) {
@@ -390,4 +393,4 @@ try {
       </div>
     </div>
   );
-  }}
+}}

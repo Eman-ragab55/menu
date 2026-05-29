@@ -157,15 +157,27 @@ export default function CartDrawer({ isOpen, onClose }) {
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
 const orderDetailsAr = cartItems?.map(item => {
-  // هنا بنقـفش الاسم لو كان نص، ولو كان Object بنجيب النص اللي جواه
-  const name = typeof item.name === 'object' ? (item.name.ar || item.name.en) : (typeof item.title === 'object' ? (item.title.ar || item.title.en) : (item.name || item.title || "صنف"));
-  return `• ${name} (عدد: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} ج.م`;
+  // 🔥 كشف المستور: لو الصنف جواه صندوق فرعي اسمه dish أو product أو item، هنسحبه علطول
+  const actualItem = item.dish || item.product || item.item || item;
+  
+  // بنجيب الاسم من الصندوق الفعلي
+  const name = typeof actualItem.name === 'object' ? (actualItem.name.ar || actualItem.name.en) : (typeof actualItem.title === 'object' ? (actualItem.title.ar || actualItem.title.en) : (actualItem.name || actualItem.title || "صنف"));
+  
+  // بنجيب السعر والكمية (سواء برة أو جوه الصندوق الفرعي)
+  const qty = item.quantity || actualItem.quantity || 1;
+  const price = actualItem.price || item.price || 0;
+  
+  return `• ${name} (عدد: ${qty}) - ${price * qty} ج.م`;
 }).join('\n') || "";
 
 const orderDetailsEn = cartItems?.map(item => {
-  const name = typeof item.name === 'object' ? (item.name.en || item.name.ar) : (typeof item.title === 'object' ? (item.title.en || item.title.ar) : (item.name || item.title || "Dish"));
-  return `• ${name} (Qty: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} EGP`;
-}).join('\n') || "";  
+  const actualItem = item.dish || item.product || item.item || item;
+  const name = typeof actualItem.name === 'object' ? (actualItem.name.en || actualItem.name.ar) : (typeof actualItem.title === 'object' ? (actualItem.title.en || actualItem.title.ar) : (actualItem.name || actualItem.title || "Dish"));
+  const qty = item.quantity || actualItem.quantity || 1;
+  const price = actualItem.price || item.price || 0;
+  
+  return `• ${name} (Qty: ${qty}) - ${price * qty} EGP`;
+}).join('\n') || ""; 
 
       // 2️⃣ الرسالة متزود عليها تفاصيل الأوردر والإجمالي
       let message = lang === "ar" 

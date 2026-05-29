@@ -103,7 +103,8 @@ export default function CartDrawer({ isOpen, onClose }) {
       alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
       return;
     }
-try {
+
+    try {
       setIsUploading(true);
       let screenshotUrl = null;
 
@@ -113,11 +114,12 @@ try {
 
         const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
 
+        // 🚀 الـ Fetch الشرعي والقياسي باستخدام الـ JWT الأصلي المنسوخ (eyJ...)
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'apikey': supabaseAnonKey,
-            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Authorization': `Bearer ${supabaseAnonKey}`, // 💡 تمرير الـ JWT الأصلي كـ Bearer لفتح حارس الـ Storage فوراً
             'Content-Type': fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
           },
           body: screenshotFile
@@ -128,10 +130,11 @@ try {
           throw new Error(`Storage Upload Failed: ${errorText}`);
         }
 
+        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
         screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
       }
 
-      // إدخال البيانات في الداتابيز
+      // إدخال البيانات في الداتابيز في جدول screenshots
       const { error: orderError } = await supabase
         .from('screenshots')
         .insert([
@@ -149,60 +152,26 @@ try {
 
       if (orderError) throw orderError;
 
-      // 1️⃣ بناء نص تفاصيل الأوردر بأعلى حماية وأمان لمنع التهنيج
-      let itemsText = "";
-      if (cartItems && Array.isArray(cartItems)) {
-        itemsText = cartItems.map(item => {
-          if (!item) return "";
-          const name = item.name || item.title || item.label || "Dish";
-          const qty = item.quantity || 1;
-          const price = item.price || 0;
-          return lang === "ar"
-            ? `• ${name} (عدد: ${qty}) - بسعر: ${price * qty} ج.م`
-            : `• ${name} (Qty: ${qty}) - Price: ${price * qty} EGP`;
-        }).filter(Boolean).join('\n');
-      }
-
       let paymentText = lang === "ar"
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
-      // 2️⃣ صياغة الرسالة الكاملة
       let message = lang === "ar" 
-        ? `*طلب جديد من Ayla Experience* 🌟\n\n` +
-          `*👤 بيانات العميل:*\n` +
-          `• الاسم: ${customerName}\n` +
-          `• التليفون: ${phone1}\n` +
-          `• العنوان: ${customerAddress}\n` +
-          `• طريقة الدفع: ${paymentText}\n\n` +
-          `*🛒 تفاصيل الأوردر:*\n${itemsText}\n\n` +
-          `*💰 الإجمالي النهائي:* ${cartTotal} ج.م\n\n` +
-          (screenshotUrl ? `*🔗 رابط إيصال الدفع:* ${screenshotUrl}\n\n` : '') +
-          `*جاري مراجعة طلبك وتجهيزه الآن!* ✨`
-        : `*New Order from Ayla Experience* 🌟\n\n` +
-          `*👤 Customer Info:*\n` +
-          `• Name: ${customerName}\n` +
-          `• Phone: ${phone1}\n` +
-          `• Address: ${customerAddress}\n` +
-          `• Payment: ${paymentText}\n\n` +
-          `*🛒 Order Details:*\n${itemsText}\n\n` +
-          `*💰 Total Price:* ${cartTotal} EGP\n\n` +
-          (screenshotUrl ? `*🔗 Screenshot URL:* ${screenshotUrl}\n\n` : '') +
-          `*Your order is being reviewed and prepared!* ✨`;
+        ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تم تسجيل الأوردر بنجاح في نظام المطعم وجاري مراجعته!*`
+        : `*New Order from Ayla Experience* 🌟\n\n*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order saved successfully and is being reviewed!*`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${menuData.whatsappNumber}?text=${encodedMessage}`;
 
       setIsUploading(false);
-
-      // الـ Redirect المتوافق مع سفاري وكروم
-      window.location.href = whatsappUrl;
+      window.open(whatsappUrl, "_blank");
 
     } catch (error) {
       console.error("Error creating order:", error);
       alert(lang === "ar" ? "حدث خطأ أثناء حفظ الطلب، حاول مرة أخرى." : "Error creating order, please try again.");
       setIsUploading(false);
     }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -393,4 +362,4 @@ try {
       </div>
     </div>
   );
-}}
+}

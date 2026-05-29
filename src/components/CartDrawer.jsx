@@ -156,9 +156,14 @@ export default function CartDrawer({ isOpen, onClose }) {
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
+// 1️⃣ السطرين دول هيلفوا على السلة ويجيبوا الأصناف والكمية والأسعار
+      const orderDetailsAr = cartItems?.map(item => `• ${item.name || item.title} (عدد: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} ج.م`).join('\n') || "";
+      const orderDetailsEn = cartItems?.map(item => `• ${item.name || item.title} (Qty: ${item.quantity || 1}) - ${item.price * (item.quantity || 1)} EGP`).join('\n') || "";
+
+      // 2️⃣ الرسالة متزود عليها تفاصيل الأوردر والإجمالي
       let message = lang === "ar" 
-        ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تم تسجيل الأوردر بنجاح في نظام المطعم وجاري مراجعته!*`
-        : `*New Order from Ayla Experience* 🌟\n\n*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order saved successfully and is being reviewed!*`;
+        ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تفاصيل الأوردر:*\n${orderDetailsAr}\n\n*💰 الإجمالي:* ${cartTotal} ج.م\n\n*جاري مراجعة الأوردر!*`
+        : `*New Order from Ayla Experience* 🌟\n\n*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order Details:*\n${orderDetailsEn}\n\n*💰 Total:* ${cartTotal} EGP\n\n*Order is being reviewed!*`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${menuData.whatsappNumber}?text=${encodedMessage}`;

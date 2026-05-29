@@ -103,8 +103,7 @@ export default function CartDrawer({ isOpen, onClose }) {
       alert(lang === "ar" ? "عذراً، يجب رفع إسكرين شوت للتحويل أولاً لتأكيد طلبك وإرساله عبر الواتساب!" : "Sorry, you must upload a transfer screenshot first to confirm your order and send it to WhatsApp!");
       return;
     }
-
-    try {
+try {
       setIsUploading(true);
       let screenshotUrl = null;
 
@@ -114,12 +113,11 @@ export default function CartDrawer({ isOpen, onClose }) {
 
         const uploadUrl = `${supabaseUrl}/storage/v1/object/screenshots/${fileName}`;
 
-        // 🚀 الـ Fetch الشرعي والقياسي باستخدام الـ JWT الأصلي المنسوخ (eyJ...)
         const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'apikey': supabaseAnonKey,
-            'Authorization': `Bearer ${supabaseAnonKey}`, // 💡 تمرير الـ JWT الأصلي كـ Bearer لفتح حارس الـ Storage فوراً
+            'Authorization': `Bearer ${supabaseAnonKey}`,
             'Content-Type': fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : 'image/png'
           },
           body: screenshotFile
@@ -130,11 +128,10 @@ export default function CartDrawer({ isOpen, onClose }) {
           throw new Error(`Storage Upload Failed: ${errorText}`);
         }
 
-        // بناء الرابط العام الفعلي للسيرفر الخاص بكِ
         screenshotUrl = `${supabaseUrl}/storage/v1/object/public/screenshots/${fileName}`;
       }
 
-      // إدخال البيانات في الداتابيز في جدول screenshots
+      // إدخال البيانات في الداتابيز
       const { error: orderError } = await supabase
         .from('screenshots')
         .insert([
@@ -152,26 +149,57 @@ export default function CartDrawer({ isOpen, onClose }) {
 
       if (orderError) throw orderError;
 
+      // 1️⃣ بناء نص تفاصيل الأوردر (الأطباق، الكميات، الأسعار) بناءً على اللغة
+      let itemsText = "";
+      if (Array.isArray(cartItems)) {
+        itemsText = cartItems.map(item => {
+          // ملحوظة: اتأكدي إن أسماء المتغيرات (item.name و item.quantity و item.price) مطابقة للي عندك في الـ state
+          return lang === "ar"
+            ? `• ${item.name || item.title} (عدد: ${item.quantity}) - بسعر: ${item.price * item.quantity} ج.م`
+            : `• ${item.name || item.title} (Qty: ${item.quantity}) - Price: ${item.price * item.quantity} EGP`;
+        }).join('\n');
+      }
+
       let paymentText = lang === "ar"
         ? (isOnline ? "📱 إنستا باي (تم حفظ الإسكرين بالسيستم)" : "💵 كاش عند الاستلام")
         : (isOnline ? "📱 InstaPay (Screenshot Saved)" : "💵 Cash on Delivery");
 
+      // 2️⃣ صياغة الرسالة الكاملة (بيانات العميل + تفاصيل الأكل بالملي)
       let message = lang === "ar" 
-        ? `*طلب جديد من Ayla Experience* 🌟\n\n*👤 بيانات العميل:*\n• الاسم: ${customerName}\n• التليفون: ${phone1}\n• طريقة الدفع: ${paymentText}\n\n*🛒 تم تسجيل الأوردر بنجاح في نظام المطعم وجاري مراجعته!*`
-        : `*New Order from Ayla Experience* 🌟\n\n*👤 Customer Info:*\n• Name: ${customerName}\n• Phone: ${phone1}\n• Payment: ${paymentText}\n\n*🛒 Order saved successfully and is being reviewed!*`;
+        ? `*طلب جديد من Ayla Experience* 🌟\n\n` +
+          `*👤 بيانات العميل:*\n` +
+          `• الاسم: ${customerName}\n` +
+          `• التليفون: ${phone1}\n` +
+          `• العنوان: ${customerAddress}\n` +
+          `• طريقة الدفع: ${paymentText}\n\n` +
+          `*🛒 تفاصيل الأوردر:*\n${itemsText}\n\n` +
+          `*💰 الإجمالي النهائي:* ${cartTotal} ج.م\n\n` +
+          (screenshotUrl ? `*🔗 رابط إيصال الدفع:* ${screenshotUrl}\n\n` : '') +
+          `*جاري مراجعة طلبك وتجهيزه الآن!* ✨`
+        : `*New Order from Ayla Experience* 🌟\n\n` +
+          `*👤 Customer Info:*\n` +
+          `• Name: ${customerName}\n` +
+          `• Phone: ${phone1}\n` +
+          `• Address: ${customerAddress}\n` +
+          `• Payment: ${paymentText}\n\n` +
+          `*🛒 Order Details:*\n${itemsText}\n\n` +
+          `*💰 Total Price:* ${cartTotal} EGP\n\n` +
+          (screenshotUrl ? `*🔗 Screenshot URL:* ${screenshotUrl}\n\n` : '') +
+          `*Your order is being reviewed and prepared!* ✨`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${menuData.whatsappNumber}?text=${encodedMessage}`;
 
       setIsUploading(false);
-      window.open(whatsappUrl, "_blank");
+
+      // 🚀 3️⃣ الحل السحري المتوافق مع سفاري وكروم وباقي المتصفحات لفتح الرابط مباشرة
+      window.location.href = whatsappUrl;
 
     } catch (error) {
       console.error("Error creating order:", error);
       alert(lang === "ar" ? "حدث خطأ أثناء حفظ الطلب، حاول مرة أخرى." : "Error creating order, please try again.");
       setIsUploading(false);
     }
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -362,4 +390,4 @@ export default function CartDrawer({ isOpen, onClose }) {
       </div>
     </div>
   );
-}
+  }}
